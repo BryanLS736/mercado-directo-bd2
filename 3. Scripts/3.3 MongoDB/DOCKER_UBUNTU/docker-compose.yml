@@ -1,0 +1,74 @@
+# Mercado Directo - MongoDB en Docker (Ubuntu)
+# Replica set rs_mercado de 3 nodos + Mongo Express (interfaz web).
+#   mongo1: primario (prioridad 2)
+#   mongo2: secundario
+#   mongo3: secundario OCULTO con retraso de 60 s (replicación asíncrona visible)
+# Las contraseñas vienen del archivo .env (lo genera 00_preparar.sh; no se escribe aquí).
+name: mercado_mongo
+
+x-mongo: &mongo
+  image: mongo:7.0
+  restart: unless-stopped
+  networks: [mercado_net]
+  # mongod exige que el keyFile pertenezca al usuario "mongodb" y tenga permiso 400:
+  # se copia dentro del contenedor y se ajusta antes de arrancar.
+  entrypoint:
+    - bash
+    - -c
+    - >
+      cp /keys/mongo.key /tmp/keyfile &&
+      chown mongodb:mongodb /tmp/keyfile && chmod 400 /tmp/keyfile &&
+      exec docker-entrypoint.sh mongod --replSet rs_mercado --bind_ip_all
+      --keyFile /tmp/keyfile --oplogSize 256
+
+services:
+  mongo1:
+    <<: *mongo
+    container_name: mongo1
+    hostname: mongo1
+    ports: ["127.0.0.1:27017:27017"]
+    volumes:
+      - mongo1_data:/data/db
+      - ./mongo.key:/keys/mongo.key:ro
+      - ../:/proyecto:ro            # scripts .js y datos .jsonl del proyecto
+      - ./:/docker:ro               # scripts adaptados a Docker
+      - ./respaldos:/respaldos      # carpeta donde se guardan los respaldos
+
+  mongo2:
+    <<: *mongo
+    container_name: mongo2
+    hostname: mongo2
+    ports: ["127.0.0.1:27018:27017"]
+    volumes:
+      - mongo2_data:/data/db
+      - ./mongo.key:/keys/mongo.key:ro
+
+  mongo3:
+    <<: *mongo
+    container_name: mongo3
+    hostname: mongo3
+    ports: ["127.0.0.1:27019:27017"]
+    volumes:
+      - mongo3_data:/data/db
+      - ./mongo.key:/keys/mongo.key:ro
+
+  mongo-express:
+    image: mongo-express:1.0.2
+    container_name: mongo_express
+    profiles: ["ui"]                 # se levanta con: docker compose --profile ui up -d
+    restart: unless-stopped
+    ports: ["127.0.0.1:8081:8081"]
+    environment:
+      ME_CONFIG_MONGODB_URL: "mongodb://${MONGO_ADMIN_USER}:${MONGO_ADMIN_PASSWORD}@mongo1:27017,mongo2:27017/?authSource=admin&replicaSet=rs_mercado"
+      ME_CONFIG_BASICAUTH_USERNAME: ${MONGO_ADMIN_USER}
+      ME_CONFIG_BASICAUTH_PASSWORD: ${MONGO_ADMIN_PASSWORD}
+    networks: [mercado_net]
+
+volumes:
+  mongo1_data:
+  mongo2_data:
+  mongo3_data:
+
+networks:
+  mercado_net:
+    driver: bridge

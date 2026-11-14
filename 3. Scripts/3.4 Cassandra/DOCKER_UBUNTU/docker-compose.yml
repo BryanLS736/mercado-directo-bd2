@@ -1,0 +1,94 @@
+# Mercado Directo - Cassandra en Docker (Ubuntu)
+# Cluster "mercado_cluster" de 3 nodos (datacenter1 / rack1) + DbGate (cliente grafico).
+# Autenticacion activada (PasswordAuthenticator + CassandraAuthorizer).
+# Las contrasenas vienen del archivo .env (lo genera 00_preparar.sh; no se escribe aqui).
+name: mercado_cassandra
+
+x-cassandra: &cassandra
+  image: cassandra:4.1
+  restart: unless-stopped
+  networks: [cassandra_net]
+  # Antes de arrancar se activan la autenticacion y los permisos en cassandra.yaml.
+  entrypoint:
+    - bash
+    - -c
+    - >
+      sed -i
+      -e 's/AllowAllAuthenticator/PasswordAuthenticator/'
+      -e 's/AllowAllAuthorizer/CassandraAuthorizer/'
+      /etc/cassandra/cassandra.yaml &&
+      exec docker-entrypoint.sh cassandra -f
+  environment: &cassandra_env
+    CASSANDRA_CLUSTER_NAME: mercado_cluster
+    CASSANDRA_DC: datacenter1
+    CASSANDRA_RACK: rack1
+    CASSANDRA_ENDPOINT_SNITCH: GossipingPropertyFileSnitch
+    CASSANDRA_SEEDS: cassandra-node1
+    MAX_HEAP_SIZE: 384M
+    HEAP_NEWSIZE: 96M
+    # Laboratorio: ring_delay 10 s (por defecto 30 s) acorta la espera de cada nodo al unirse.
+    JVM_EXTRA_OPTS: "-Dcassandra.ring_delay_ms=10000"
+  healthcheck:
+    # OJO: statusbinary imprime "running" o "not running". Hay que comparar la salida COMPLETA:
+    # con grep -q running tambien coincidiria "not running" y el nodo se daria por listo
+    # mientras todavia se esta uniendo al cluster (y el siguiente nodo entraria a la vez).
+    test: ["CMD-SHELL", "[ \"$$(nodetool statusbinary 2>/dev/null)\" = running ]"]
+    interval: 10s
+    timeout: 15s
+    retries: 60
+    start_period: 30s
+
+services:
+  cassandra-node1:
+    <<: *cassandra
+    container_name: cassandra-node1
+    hostname: cassandra-node1
+    ports: ["9042:9042"]
+    volumes:
+      - cassandra_data_1:/var/lib/cassandra
+      - ../:/proyecto:ro            # scripts .cql y datos .csv del proyecto
+      - ./:/docker:ro
+      - ./respaldos:/respaldos      # carpeta de respaldos
+
+  # Los nodos se unen de uno en uno (un nodo nuevo no puede entrar mientras otro esta entrando).
+  cassandra-node2:
+    <<: *cassandra
+    container_name: cassandra-node2
+    hostname: cassandra-node2
+    ports: ["9043:9042"]
+    depends_on:
+      cassandra-node1: { condition: service_healthy }
+    volumes:
+      - cassandra_data_2:/var/lib/cassandra
+      - ./respaldos:/respaldos
+
+  cassandra-node3:
+    <<: *cassandra
+    container_name: cassandra-node3
+    hostname: cassandra-node3
+    ports: ["9044:9042"]
+    depends_on:
+      cassandra-node2: { condition: service_healthy }
+    volumes:
+      - cassandra_data_3:/var/lib/cassandra
+      - ./respaldos:/respaldos
+
+  dbgate:
+    image: dbgate/dbgate:latest
+    container_name: dbgate
+    profiles: ["ui"]                 # se levanta con: docker compose --profile ui up -d
+    restart: unless-stopped
+    ports: ["3000:3000"]
+    volumes:
+      - dbgate_data:/root/.dbgate
+    networks: [cassandra_net]
+
+volumes:
+  cassandra_data_1:
+  cassandra_data_2:
+  cassandra_data_3:
+  dbgate_data:
+
+networks:
+  cassandra_net:
+    driver: bridge
