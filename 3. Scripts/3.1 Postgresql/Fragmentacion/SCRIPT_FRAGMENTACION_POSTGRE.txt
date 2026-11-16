@@ -1,0 +1,78 @@
+-- ============================================================
+-- 1. CREACION DE LOS FRAGMENTOS (esquema mercado)
+-- ============================================================
+
+-- F1: Frutas y Verduras (categoria_id 1 y 2)
+DROP TABLE IF EXISTS mercado.producto_f1;
+
+CREATE TABLE mercado.producto_f1 AS
+SELECT *
+FROM mercado.producto
+WHERE categoria_id IN (1, 2);
+
+
+-- F2: Tuberculos y Granos (categoria_id 3 y 4)
+DROP TABLE IF EXISTS mercado.producto_f2;
+
+CREATE TABLE mercado.producto_f2 AS
+SELECT *
+FROM mercado.producto
+WHERE categoria_id IN (3, 4);
+
+
+-- F3: Legumbres y Hortalizas (categoria_id 5 y 6)
+DROP TABLE IF EXISTS mercado.producto_f3;
+
+CREATE TABLE mercado.producto_f3 AS
+SELECT *
+FROM mercado.producto
+WHERE categoria_id IN (5, 6);
+
+
+-- F4: Cereales y Frutos secos (categoria_id 7 y 8)
+DROP TABLE IF EXISTS mercado.producto_f4;
+
+CREATE TABLE mercado.producto_f4 AS
+SELECT *
+FROM mercado.producto
+WHERE categoria_id IN (7, 8);
+
+
+-- F5: Hierbas aromaticas y Otros (categoria_id 9 y 10)
+DROP TABLE IF EXISTS mercado.producto_f5;
+
+CREATE TABLE mercado.producto_f5 AS
+SELECT *
+FROM mercado.producto
+WHERE categoria_id IN (9, 10);
+
+
+
+
+-- ============================================================
+-- 2. VERIFICACION DE LA FRAGMENTACION
+-- ============================================================
+
+SELECT 'F1 - Frutas y Verduras' AS fragmento, COUNT(*) AS cantidad
+FROM mercado.producto_f1
+
+UNION ALL
+
+SELECT 'F2 - Tuberculos y Granos', COUNT(*)
+FROM mercado.producto_f2
+
+UNION ALL
+
+SELECT 'F3 - Legumbres y Hortalizas', COUNT(*)
+FROM mercado.producto_f3
+
+UNION ALL
+
+SELECT 'F4 - Cereales y Frutos secos', COUNT(*)
+FROM mercado.producto_f4
+
+UNION ALL
+
+SELECT 'F5 - Hierbas aromaticas y Otros', COUNT(*)
+FROM mercado.producto_f5;
+

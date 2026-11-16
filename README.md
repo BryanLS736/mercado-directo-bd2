@@ -1,12 +1,12 @@
 # MERCADO DIRECTO - BASE DE DATOS II
----
 
 ## Integrantes
-- Luque Serna, Bryan Alexander
-- 
-- 
-- 
-- 
+- Bryan Alexander Luque Serna
+- Diego Alvaro Ayay Palomino
+- Misael Martín Alarcón Maza
+- Isabella Valentyna Segura Pizarro
+- Jheremy Carlos Guizado Sosa
+
 
 ## Tecnologías del Proyecto
 - Postgresql
